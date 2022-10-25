@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#html files since I am just using for testing and I don't own
+*.htm
+*.html
