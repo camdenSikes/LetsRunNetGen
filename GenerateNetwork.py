@@ -19,7 +19,7 @@ class LetsRunParser(HTMLParser):
                         self.curind += 1
         if (tag == "a"):
             for tup in attrs:
-                if tup[0] == "class" and tup[1] == "mention-link":
+                if tup[0] == "class" and (tup[1] == "mention-link" or tup[1] == "author-link"):
                     #only looking at main reply reference
                     break
                 if tup[0] == "href" and "post" in tup[1]:
