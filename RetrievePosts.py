@@ -1,26 +1,42 @@
-from operator import indexOf
-import struct
-from typing import Tuple
-from requests import request
-from GenerateNetwork import generateNetwork
-import urllib3
-from html.parser import HTMLParser
-import numpy as np
 import pickle
+import struct
+import time
+from html.parser import HTMLParser
+from operator import indexOf
+from typing import Tuple
+
+import numpy as np
+import urllib3
+from requests import request
+from scipy import io, sparse
+
+from GenerateNetwork import generateNetwork
+
 
 class NetworkList:
-    networks: list[np.array] = []
+    networks: list[sparse.csc_matrix] = []
     userlists: list[list[str]] = []
     urls: list[str] = []
+    isRunningRelated: list[bool] = []
+    categories: list[str] = []
+    labelLists: list[list[int]] = []
 
-    def append(self, network: np.array, userlist: list[str], url: str) -> None:
+    def append(self, network: np.array, userlist: list[str], url: str, running: bool, category: str, labelList: list[int]) -> None:
         self.networks.append(network)
         self.userlists.append(userlist)
         self.urls.append(url)
+        self.isRunningRelated.append(running)
+        self.categories.append(category)
+        self.labelLists.append(labelList)
 
     def get(self, i: int) -> Tuple[np.array, list[str], str]:
         #TODO: make sure ind is within bounds
-        return(self.networks[i],self.userlists[i],self.urls[i])
+        return(self.networks[i],self.userlists[i],self.urls[i],self.isRunningRelated[i],self.categories[i],self.labelLists[i])
+
+    def printCats(self) -> None:
+        for i in range(len(self.categories)):
+            print(str(i)+": "+self.categories[i])
+
 
 class HomepageParser(HTMLParser):
     threads = []
@@ -67,11 +83,24 @@ def getStrings(urls: list[str], counts: list[int]) -> list[str]:
     (urls,counts) = getThreads()
     strings = []
     for i in range(len(urls)):
-        r = http.request("GET",urls[i])
+        try:
+            r = http.request("GET",urls[i])
+        except:
+            time.sleep(2)
+            try:
+                r = http.request("GET",urls[i])
+            except:
+                print("failed to get post")
+                continue
         strings.append(r.data.decode('utf-8'))
-        #for now, only look at first 10 pages
-        for j in range(1,min(counts[i]+1,10)):
-            r = http.request("GET",urls[i]+"&page="+str(j))
+        #for now, only look at first 10 pages not anymore
+        for j in range(1,counts[i]+1):
+            try:
+                r = http.request("GET",urls[i]+"&page="+str(j),)
+            except:
+                break
+            if(r.status != 200):
+                break
             strings[i] += r.data.decode("utf-8")
     return strings
 
@@ -79,14 +108,20 @@ def getStrings(urls: list[str], counts: list[int]) -> list[str]:
 
 if __name__ == "__main__":
     (urls,counts) = getThreads()
+    print("got " + str(len(urls)) + " threads")
     strings = getStrings(urls,counts)
+    print("got all strings")
     nets = NetworkList()
-    for i in range(len(urls)):
-        (users,adjMat) = generateNetwork(strings[i])
-        nets.append(adjMat,users,urls[i])
+    netDict = dict()
+    for i in range(len(strings)):
+        (users,adjMat,running,category,labels) = generateNetwork(strings[i])
+        nets.append(adjMat,users,urls[i],running,category,labels)
+        netDict[str(i)] = adjMat
+        print("made matrix")
     outfile = open("networks.pkl","wb")
-    print(nets.networks[3])
     pickle.dump(nets,outfile)
+    io.savemat("nets.mat", netDict)
+    nets.printCats()
 
 
     
